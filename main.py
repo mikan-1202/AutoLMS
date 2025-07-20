@@ -7,17 +7,20 @@ from selenium.common.exceptions import NoSuchElementException
 CHROME_PATH = r"C:\Program Files\Google\Chrome\Application\chrome.exe"  # Chrome実行ファイルのパス
 USER_DATA_DIR = os.path.join(os.getcwd(), "chrome_profile")  # プロファイル保存先
 DEBUG_PORT = 9222
-OTP_SENDER = "slink-info@secioss.co.jp"
+OTP_SENDER = ""
 BASE_DIR = os.path.dirname(sys.executable if getattr(sys, 'frozen', False) else os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
+
 def launch_detached_chrome():
     if not os.path.exists(USER_DATA_DIR): os.makedirs(USER_DATA_DIR)
     cmd = [CHROME_PATH, f'--remote-debugging-port={DEBUG_PORT}', f'--user-data-dir={USER_DATA_DIR}', "--no-first-run", "--no-default-browser-check"]
     subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    
 def attach_to_chrome():
     options = Options()
     options.add_experimental_option("debuggerAddress", f"localhost:{DEBUG_PORT}")
     return webdriver.Chrome(options=options)
+    
 def load_or_create_config():
     if os.path.exists(CONFIG_FILE):
         try:
@@ -28,11 +31,12 @@ def load_or_create_config():
     config = {
         "student_id": input("学生番号: "),
         "password": getpass.getpass("LMSパスワード: "),
-        "email": input("OTP通知用メールアドレス (例: xxx@gmail.com): "),
+        "email": input("OTP通知用メールアドレス: "),
         "email_password": getpass.getpass("メールパスワード（アプリパスワードなど）: ")
     }
     with open(CONFIG_FILE, "w") as f: json.dump(config, f)
     return config
+    
 def fetch_otp(email_user, email_pass):
     try:
         with imaplib.IMAP4_SSL("imap.gmail.com") as imap:
@@ -56,6 +60,7 @@ def fetch_otp(email_user, email_pass):
     except Exception as e:
         print(f"メール取得中にエラー: {e}")
     return None
+    
 def safe_find_element(driver, by, value, timeout=10):
     end_time = time.time() + timeout
     while time.time() < end_time:
@@ -64,8 +69,9 @@ def safe_find_element(driver, by, value, timeout=10):
         except NoSuchElementException:
             time.sleep(0.5)
     return None
+    
 def login_lms(driver, config):
-    driver.get("https://lms.tohtech.ac.jp/")
+    driver.get("https://lms.******/")
     time.sleep(1)
     login_btn = safe_find_element(driver, By.CLASS_NAME, "buttonLabel")
     if not login_btn:
@@ -103,6 +109,7 @@ def login_lms(driver, config):
     except NoSuchElementException:
         print("OTP認証方式選択が見つかりません。スキップします。")
     return True
+    
 def enter_otp(driver, config):
     print("OTP入力欄の待機中...")
     otp_input = safe_find_element(driver, By.ID, "password_input", timeout=30)
@@ -153,6 +160,7 @@ def enter_otp(driver, config):
         print("OTP再送信し次を待機。")
     print("全OTP試行に失敗。")
     return False
+    
 def close_extra_windows(driver):
     main = driver.current_window_handle
     for handle in driver.window_handles:
