@@ -1,118 +1,141 @@
-# 📘 LMS 自動ログイン・OTP認証スクリプト
+# LMS Login — メールOTP認証のログイン補助
 
-## ✅ 概要
-このスクリプトは、対象大学のLMSに対し、以下を自動で実行します：
+PythonとSeleniumで対象大学のLMSログイン画面を操作し、Gmailに届く8桁のワンタイムパスワード（OTP）を取得・入力するCLIアプリです。
 
-- Chromeをプロファイル付きで起動（デバッグモード）
-- LMSにログイン
-- メールによるOTPを取得
-- 自動的にOTPを入力しログイン完了
-- 最前面以外のウィンドウを自動で閉じる
+過去にAIでコードを生成して作成したアプリを、就職活動に向けてAIツールによるコードレビュー・実装補助を活用して改善しました。ログイン自動操作とメールOTP取得は元からある機能です。今回の変更内容・根拠・AIの関与は [改善記録](docs/improvements.md) にまとめています。
 
-## 💻 使用方法
+## 作った目的
 
-実際には動きません。ご了承ください。
+LMS利用時の学生番号・パスワード入力と、メールを開いてOTPを転記する操作を補助するアプリです。この説明は既存コードの動作に基づきます。制作時期・利用人数・時間短縮率など、記録から確認できない実績は記載していません。
 
-### 1. 前提条件
+## 主な機能
 
-- Google Chrome がインストールされていること（`CHROME_PATH`を確認）
-- Python 3.x インストール済み
-- GmailのIMAPアクセスを有効にしていること
+- ChromeでLMSを開き、学生番号・パスワードを入力
+- メールOTP認証方式の選択
+- 指定送信元の未読メールから8桁のOTPを抽出・入力
+- OTPの待機・再送・送信再試行
+- 認証送信後のエラー非検出時に余分なウィンドウを閉じ、ブラウザを残す
+- 設定JSONの読込と初回入力（新規保存ではパスワードを保存しない）
 
-### 2. 最初の実行で必要な情報
+## 使用技術・処理の構成
 
-初回実行時に以下の情報を入力する必要があります：
+Python / Selenium / Chrome / 標準ライブラリのimaplib・email・unittest / PyInstaller / Ruff。
 
-- 学生番号
-- LMSパスワード
-- OTP用メールアドレス（Gmail想定）
-- メールパスワード（またはアプリパスワード）
-
-これらは`config.json`に保存され、次回からは入力不要です。
-
----
-
-## 📂 ファイル構成
-
-- `main.py` ： スクリプト本体
-- `config.json` ： ログイン情報（自動生成）
-- `chrome_profile/` ： Chromeのユーザープロファイル（自動生成）
-
----
-
-## 🧠 主な処理の流れ
-
-1. `launch_detached_chrome()`  
-　Chromeをデバッグモード＆ユーザープロファイル付きで起動
-
-2. `attach_to_chrome()`  
-　Seleniumが起動中のChromeに接続
-
-3. `load_or_create_config()`  
-　設定ファイル（学生番号、パスワード、メール等）を読み込むか新規作成
-
-4. `login_lms(driver, config)`  
-　LMSへログイン（ユーザーID、パスワード）
-
-5. `enter_otp(driver, config)`  
-　GmailからOTPメールを取得し、自動で入力・ログイン
-
-6. `close_extra_windows(driver)`  
-　ログイン後、余計なウィンドウを自動で閉じる
-
----
-
-## ⚙️ カスタマイズ可能な定数
-
-```python
-CHROME_PATH = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
-USER_DATA_DIR = os.path.join(os.getcwd(), "chrome_profile")
-DEBUG_PORT = 9222
-OTP_SENDER = "slink-info@secioss.co.jp"
+```text
+Login.py → app.py（起動・終了処理）
+              ├─ config.py（設定読込・入力・検証）
+              └─ browser.py（LMS画面の操作）
+                     └─ otp.py（IMAP取得・本文解析・期限付き待機）
 ```
 
----
+## 技術的に工夫した点
 
-## 🐞 エラーが出るとき
+- **既存の工夫**：画面操作とメール取得を組み合わせ、要素待機とOTP再試行を実装。パスワード入力に `getpass` を使用。
+- **今回の改善**：単調増加時計で待機期限を管理し、再送しても期限を延長しない。メール処理と画面操作を分離し、通信を行わないテストを可能にした。
+- メールは新しいUIDから確認し、`BODY.PEEK[]` で取得。採用したOTPのメールだけを明示的に既読化する。
+- 既存JSONとの互換性を保ち、新規設定のパスワード保存とOTPのログ出力を避ける。
 
-- GmailのIMAPが有効になっているか確認
-- アプリパスワードの使用
-- Chromeのパスが間違っていないか確認
-- 2段階認証メールが迷惑メールに分類されていないか確認
+## プロジェクト構成
 
----
-
-## 🔒 注意
-
-- `config.json`にはパスワードが平文で保存されます。安全な環境で使用してください。
-- セキュリティ上、スクリプトの取り扱いには十分注意してください。
-
----
-
-## 📌 依存ライブラリ
-
-標準ライブラリ：
-- `os`, `sys`, `json`, `time`, `re`, `imaplib`, `email`, `getpass`, `subprocess`
-
-外部ライブラリ：
-- `selenium`
-
-インストール：
-```bash
-pip install selenium
+```text
+Login.py                 起動入口
+Login.spec               コンソール付き実行ファイルのビルド設定
+lms_login/
+  app.py                 CLI・異常時の終了
+  config.py              設定の読込・検証
+  browser.py             Seleniumによる画面操作
+  otp.py                 メール解析・取得・待機
+  settings.py            接続先・待機時間・試行回数
+tests/                   外部サービス不要のユニットテスト
+docs/                    改善記録・応募用文章・ソース差分
+config.example.json      個人情報を含まない設定例
+requirements*.txt        実行・開発用の依存関係
+pyproject.toml           Ruff設定
 ```
 
----
+## インストール方法
 
-## 🏁 実行
+検証環境はWindows、Python 3.12.14です。Chromeと、対象LMSの利用権限・OTP通知先GmailのIMAP認証手段が必要です。第三者はアカウントなしでテストとヘルプを実行できますが、実ログインには本人のアカウントが必要です。
 
-```bash
-python main.py
+リポジトリを取得してフォルダを開き、PowerShellで実行します。
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe Login.py --help
 ```
 
----
+`python` が見つからない場合はPythonを導入してPATHを設定してください。仮想環境のactivateは不要です。初回のChromeDriver準備にはSelenium Managerによるダウンロードが発生する場合があり、ネットワーク接続が必要です。
 
-## 🧹 後始末
+## 実行・操作方法
 
-- `config.json`を削除すれば、次回から再入力が可能です。
-- `chrome_profile`フォルダを削除すれば、Chromeのユーザーデータも削除されます。
+公開版では先にPowerShellで `$env:LMS_URL = "https://実際のLMSのホスト名/"` を設定してください。大学固有の画面構造は維持しているため、任意のLMSに対応するものではありません。
+
+```powershell
+.\.venv\Scripts\python.exe Login.py
+```
+
+1. 初回は学生番号・OTP通知先Gmail・LMSパスワード・メールのアプリパスワードを入力します。
+2. 学生番号とメールアドレスのみ `config.json` に保存します。パスワードは非表示入力です。
+3. Chromeが開き、自動で認証情報とOTPを入力します。
+4. エラー非検出のメッセージが出たら、LMS画面でログイン状態を確認してください。利用後はChromeを手動で閉じます。
+
+途中終了は `Ctrl+C`。失敗時は起動したブラウザの終了を試みます。終了コードは通常終了0、処理失敗1、中断130です。
+
+別の設定を使う場合：
+
+```powershell
+.\.venv\Scripts\python.exe Login.py --config path\to\config.json
+```
+
+既存JSONの `password`・`email_password` は互換性のため読み込めますが、平文のままです。安全な場所に必要な情報を確保したうえで、その2項目を削除すると実行時入力へ切り替わります。既存ファイルを自動削除・移行はしません。
+
+環境変数 `LMS_PASSWORD`・`LMS_EMAIL_PASSWORD` も利用できます。優先順位は環境変数 → 既存JSON → 対話入力です。環境変数は暗号化保管ではありません。秘密を含むコマンドをシェル履歴に残さないよう、通常は非表示の対話入力を使用してください。
+
+公開版では大学名と接続先を匿名化しています。環境変数 `LMS_URL` に、利用権限のある対象LMSの実際のHTTPS URLを指定してください。未設定時は認証情報を入力する前に終了します。`settings.py` に集約していますが、他校LMSへの汎用対応ではなく、画面セレクターも対象サービスに依存します。
+
+## テスト・整形・ビルド
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe -m ruff check Login.py lms_login tests
+.\.venv\Scripts\python.exe -m ruff format --check Login.py lms_login tests
+.\.venv\Scripts\python.exe -m PyInstaller Login.spec
+```
+
+ビルド後は `dist\Login.exe` を起動します。設定の既定位置は実行ファイルの隣です。対話入力を行うためコンソール付きです。実行用依存と開発ツールを分け、バージョン範囲を指定しています。厳密なロックファイルではないため、将来の導入時に同じバージョンになる保証はありません。
+
+## 注意事項・制限
+
+- 自分が利用権限を持つアカウントと、所属先が許可する範囲で利用してください。
+- `config.json`、Chromeプロファイル、ビルド済みexeは公開しません。`.gitignore` は既にコミットされた情報を履歴から消す機能ではありません。
+- 元の作業フォルダの個人設定・プロファイル・旧exeはローカルに残しています。フォルダ全体をZIP化して公開しないでください。
+- 実際のLMS認証・Gmail通信・実ブラウザ操作は今回未検証です。自動テストはメール・ブラウザをモック化しています。
+- 成功判定は旧実装の「エラー要素が見つからない」を継承しています。認証済みであることを厳密に保証せず、画面確認が必要です。
+- 未読・送信元・8桁の形式でOTPを探します。今回の認証要求との時刻対応は検証していないため、古い未読OTPを拾う可能性があります。HTMLのみのメールは対象外です。
+- 待機は1セット90秒、60秒後に1回再送、最大3セット・各2回送信です。取得できなければそのセットで終了します。同期通信中は即時中断しないため、通信・画面操作の時間だけ期限を超える場合があります。
+- メール認証・通信エラーは理由を一般化して表示し、処理を終了します。サービスの応答本文や秘密は出力しません。
+
+## 今回の改善
+
+過去にAIでコードを生成したログイン補助アプリを、AIツールのレビュー・実装補助を活用して整備しました。既存のPython・Seleniumと認証フローを維持し、設定・メール・ブラウザ操作の責務を分離。OTP待機の終了条件、秘密情報の扱い、異常時の終了処理を見直し、テストと導入手順を追加しました。作業フォルダにGit履歴がなかったため、作業開始時点のソースと改修後の差分に基づく記録です。
+
+## 今後改善できる点
+
+- 実サービスでの動作確認と、認証済み画面の要素による成功判定
+- OTPメールと現在の認証要求の対応付け
+- 実画面に基づく固定sleepの条件待機への置換
+- 必要に応じたOSの資格情報保管庫・OAuthへの対応
+- 検証環境の拡大と依存バージョンの固定
+
+詳細は [改善記録](docs/improvements.md)、[応募・面接用文章](docs/portfolio.md) を参照してください。
+
+## 権利・ライセンス
+
+依存ライブラリのライセンスと公開前の確認事項は [権利確認記録](docs/rights-review.md) に記載しています。本プロジェクト独自の再利用ライセンスは現時点では付与していません。
+
+
+## 既存公開版からの更新
+
+公開準備時にGitHub上の2025年7月20日の履歴を確認した。比較元は `REDACTED_PRE_CLEANUP_COMMIT`。旧公開版との違いと履歴の扱いは [改善記録](docs/improvements.md) を参照。`python main.py` も互換用の入口として利用できる。最新版の匿名化は過去のコミットに残る大学名・作者メールを削除するものではない。
