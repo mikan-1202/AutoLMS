@@ -31,4 +31,4 @@
 git apply --stat docs/source-changes.diff
 ```
 
-公開版では `python main.py` も互換用の入口として利用できます。変更内容は [改善記録](improvements.md) を参照してください。
+公開版では `python main.py` も互換用の入口として利用できます。
