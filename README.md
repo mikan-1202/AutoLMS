@@ -45,7 +45,7 @@ lms_login/
   otp.py                 メール解析・取得・待機
   settings.py            接続先・待機時間・試行回数
 tests/                   外部サービス不要のユニットテスト
-docs/                    検証結果・依存ライブラリ情報・補足資料
+docs/                    依存ライブラリ情報・補足資料
 config.example.json      個人情報を含まない設定例
 requirements*.txt        実行・開発用の依存関係
 pyproject.toml           Ruff設定
@@ -71,7 +71,7 @@ python -m venv .venv
 - 再送で待機期限が延びないこと、送信回数の上限、例外時のブラウザ終了
 - LMS URLの検証
 
-検証履歴は [検証結果](docs/validation.md) に記載しています。ユニットテストの対象に、実サービスでのログイン確認は含まれません。
+ユニットテストの対象に、実サービスでのログイン確認は含まれません。
 
 ## 補足
 
